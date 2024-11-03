@@ -1,0 +1,139 @@
+﻿@page "/"
+@using System.ComponentModel.DataAnnotations
+@using ConsumpOtp.Models
+@using ConsumpOtp.Controllers
+@using ConsumpOtp.Components.Shared
+@inject NavigationManager nav
+@rendermode InteractiveServer
+
+
+<PageTitle>Home</PageTitle>
+
+<h1>กระบวนการยืนยันตนขอ OTP ทาง SMS</h1>
+<div class="row">
+    <div class="col-md-4">
+
+        <Alert @ref="alert" />
+
+        <section>
+            @if (IsvisiblePhoneNumber)
+            {
+                <EditForm Model="Input" method="post" OnValidSubmit="OnLogin" FormName="Login">
+                <DataAnnotationsValidator  />
+                <hr />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.PhoneNumber" class="form-control" aria-required="true" />
+                    <label for="text" class="form-label">เบอร์โทรศัพท์</label>
+                    <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+                </div>
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">ขอเลข OTP</button>
+                </div>
+            </EditForm>
+            }
+            
+            @if (IsVisible)
+            {
+                <EditForm Model="Input" method="post" OnValidSubmit="OnVerify" FormName="Login2">
+                <DataAnnotationsValidator  />
+                <hr />
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.PhoneNumber" class="form-control" aria-required="true" style="display: none;" readonly/>
+                    <label for="text" class="form-label">เบอร์โทรศัพท์</label>
+                    <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
+                </div>
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.Otp" class="form-control" aria-required="true" />
+                    <label for="text" class="form-label">เลข OTP</label>
+                    <ValidationMessage For="() => Input.Otp" class="text-danger" />
+                </div>
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary">ยืนยัน OTP</button>
+                </div>
+            </EditForm>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    private Alert alert;
+    private bool IsvisiblePhoneNumber = true;
+    private bool IsVisible = false;
+    
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    public OtpRequest logins {get; set;} = new();
+    public OtpRequest verifies {get; set;} = new();
+    public async Task OnLogin()
+    {
+       var logins = await ServiceHelper.PostOtp(Input.PhoneNumber);
+        try 
+        {
+            if (logins.message == "OTP sent successfully.")
+            {
+                
+                // Alert for OTP requirement
+                alert.ShowSuccess("กรุณากรอกเลข OTP");
+                IsvisiblePhoneNumber = false;
+                IsVisible = true;
+            }
+            else
+            {
+                // Alert for invalid credentials if no passweb
+                alert.ShowFailed("กรุณาตรวจสอบเบอร์โทรศัพท์ที่ถูกต้อง เช่น 08xxxxxxxx");
+                nav.NavigateTo("/");
+            }
+        }
+        catch (Exception e)
+        {
+            // Alert for exceptions, possibly log the exception
+            alert.ShowFailed("An error occurred during login");
+        }
+    }
+
+     public async Task OnVerify()
+    {
+       var verifies = await ServiceHelper.PostVerify(Input.PhoneNumber, Input.Otp);
+        try 
+        {
+            if (verifies.message == "OTP verified successfully.")
+            {
+                
+                // Alert for OTP requirement
+                alert.ShowSuccess("เลขรหัส OTP ถูกต้อง");
+                IsVisible = false;
+                IsvisiblePhoneNumber = false;
+            }
+            else
+            {
+                // Alert for invalid credentials if no passweb
+                alert.ShowFailed("เลขรหัส OTP ถูกต้อง ไม่ถูกต้อง");
+                nav.NavigateTo("/");
+            }
+        }
+        catch (HttpRequestException httpEx)
+        {
+            // Log the details of the HTTP request failure
+            alert.ShowFailed($"Request error: {httpEx.Message}");
+        }
+        catch (Exception e)
+        {
+            // Alert for exceptions, possibly log the exception
+            alert.ShowFailed("เลข OTP ไม่ถูกต้อง กรุณากรอกให้ถูกต้อง");
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        public string PhoneNumber { get; set; } = "";
+
+        public string Otp { get; set; } = "";
+
+    }
+
+}   
+
+   
